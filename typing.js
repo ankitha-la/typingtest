@@ -21,6 +21,16 @@ function formatWord(word) {
 }
 
 function newGame() {
+    // Clear any existing timer
+    clearInterval(window.timer);
+    window.timer = null;
+    window.gameStart = null;
+    
+    // Hide results popup if visible
+    removeClass(document.getElementById('results-popup'), 'visible');
+    removeClass(document.getElementById('game'), 'over');
+    
+    // Reset game state
     document.getElementById('words').innerHTML = '';
     document.getElementById('words').style.marginTop = '0px';
     for (let i = 0; i < 200; i++) {
@@ -29,8 +39,6 @@ function newGame() {
     addClass(document.querySelector('.word'), 'current');
     addClass(document.querySelector('.letter'), 'current');
     document.getElementById('info').innerHTML = (gameTime / 1000) + '';
-    window.timer = null;
-    window.gameStart = null;
     
     // Position cursor at the first letter when game starts
     setTimeout(() => {
@@ -42,6 +50,23 @@ function newGame() {
             cursor.style.left = rect.left + 'px';
         }
     }, 0);
+}
+
+function startTimer() {
+    if (!window.timer && !window.gameStart) {
+        window.gameStart = (new Date()).getTime();
+        window.timer = setInterval(() => {
+            const currentTime = (new Date()).getTime();
+            const msPassed = currentTime - window.gameStart;
+            const sPassed = Math.round(msPassed / 1000);
+            const sLeft = Math.round((gameTime / 1000) - sPassed);
+            if (sLeft <= 0) {
+                gameOver();
+                return;
+            }
+            document.getElementById('info').innerHTML = sLeft + '';
+        }, 1000);
+    }
 }
 
 function getGameStats() {
@@ -60,7 +85,6 @@ function getGameStats() {
         const incorrectLetters = letters.filter(letter => letter.className.includes('incorrect'));
         const correctLetters = letters.filter(letter => letter.className.includes('correct'));
         
-        // A word is correct only if all letters are correct and none are incorrect
         if (incorrectLetters.length === 0 && correctLetters.length === letters.length) {
             correctWords++;
         } else {
@@ -73,7 +97,7 @@ function getGameStats() {
     
     const totalChars = totalCorrectChars + totalIncorrectChars;
     const accuracy = totalChars > 0 ? Math.round((totalCorrectChars / totalChars) * 100) : 0;
-    const wpm = correctWords / (gameTime / 60000); // words per minute
+    const wpm = correctWords / ((gameTime / 1000) / 60);
     
     return {
         wpm: Math.round(wpm),
@@ -131,21 +155,8 @@ document.getElementById('game').addEventListener('keyup', ev => {
         return;
     }
 
-    if (!window.timer && (isLetter || isSpace)) {
-        window.timer = setInterval(() => {
-            if (!window.gameStart) {
-                window.gameStart = (new Date()).getTime();
-            }
-            const currentTime = (new Date()).getTime();
-            const msPassed = currentTime - window.gameStart;
-            const sPassed = Math.round(msPassed / 1000);
-            const sLeft = Math.round((gameTime / 1000) - sPassed);
-            if (sLeft <= 0) {
-                gameOver();
-                return;
-            }
-            document.getElementById('info').innerHTML = sLeft + '';
-        }, 1000);
+    if (isLetter || isSpace) {
+        startTimer();
     }
 
     if (isLetter) {
@@ -165,14 +176,12 @@ document.getElementById('game').addEventListener('keyup', ev => {
 
     if (isSpace) {
         if (currentLetter) {
-            // Space pressed when there are still letters left - mark as incorrect
             addClass(currentLetter, 'incorrect');
             removeClass(currentLetter, 'current');
             if (currentLetter.nextSibling) {
                 addClass(currentLetter.nextSibling, 'current');
             }
         } else if (currentWord) {
-            // Move to next word only when at end of current word
             removeClass(currentWord, 'current');
             if (currentWord.nextSibling) {
                 addClass(currentWord.nextSibling, 'current');
@@ -182,12 +191,10 @@ document.getElementById('game').addEventListener('keyup', ev => {
     }
 
     if (isBackspace) {
-        // Handle extra letters first
         const extraLetters = [...document.querySelectorAll('.letter.extra')];
         if (extraLetters.length > 0) {
             const lastExtraLetter = extraLetters[extraLetters.length - 1];
             lastExtraLetter.remove();
-            // Set cursor to the last letter of the current word
             const lastLetter = currentWord.lastChild;
             if (lastLetter) {
                 removeClass(document.querySelector('.letter.current'), 'current');
@@ -198,7 +205,6 @@ document.getElementById('game').addEventListener('keyup', ev => {
         }
 
         if (currentLetter && isFirstLetter) {
-            // Move to previous word
             if (currentWord.previousSibling) {
                 removeClass(currentWord, 'current');
                 addClass(currentWord.previousSibling, 'current');
@@ -209,20 +215,17 @@ document.getElementById('game').addEventListener('keyup', ev => {
                 removeClass(prevWordLastLetter, 'correct');
             }
         } else if (currentLetter) {
-            // Move back within current word
             removeClass(currentLetter, 'current');
             addClass(currentLetter.previousSibling, 'current');
             removeClass(currentLetter.previousSibling, 'incorrect');
             removeClass(currentLetter.previousSibling, 'correct');
         } else if (currentWord) {
-            // At start of word with no current letter
             addClass(currentWord.lastChild, 'current');
             removeClass(currentWord.lastChild, 'incorrect');
             removeClass(currentWord.lastChild, 'correct');
         }
     }
 
-    // Adjust word container position if needed
     if (currentWord && currentWord.getBoundingClientRect().top > 250) {
         const wordsContainer = document.getElementById('words');
         const margin = parseInt(wordsContainer.style.marginTop || '0px');
@@ -232,23 +235,23 @@ document.getElementById('game').addEventListener('keyup', ev => {
     updateCursor();
 });
 
-// Event listeners for buttons
+// New Game button - immediately resets without showing stats
 document.getElementById('newGameBtn').addEventListener('click', () => {
-    removeClass(document.getElementById('game'), 'over');
-    removeClass(document.getElementById('results-popup'), 'visible');
     newGame();
 });
 
+// Results popup buttons
 document.getElementById('try-again-btn').addEventListener('click', () => {
-    removeClass(document.getElementById('game'), 'over');
-    removeClass(document.getElementById('results-popup'), 'visible');
     newGame();
 });
 
 document.getElementById('new-game-btn').addEventListener('click', () => {
-    removeClass(document.getElementById('game'), 'over');
-    removeClass(document.getElementById('results-popup'), 'visible');
     newGame();
+});
+
+// Make focus-error clickable to start the game
+document.getElementById('focus-error').addEventListener('click', () => {
+    document.getElementById('game').focus();
 });
 
 newGame();

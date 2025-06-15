@@ -71,6 +71,7 @@ div#game:focus {
     inset: 0;
     text-align: center;
     padding-top: 35px;
+    cursor: pointer;
 }
 #game:focus #focus-error {
     display: none;
